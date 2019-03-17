@@ -1,14 +1,17 @@
 #!/bin/sh
 
-if [ -d "/media/Backups" ] ; then
-    if [ -f "/media/Backups/autosnap" ] ; then
-        if [ -f "/media/Backups/autosnap.pid" ] ; then
+
+dir=`mount | grep Backup | awk '{print $3}'`
+
+if [ -d "$dir" ] ; then
+    if [ -f "$dir/autosnap" ] ; then
+        if [ -f "$dir/auitosnap.pid" ] ; then
             exit
         fi
         touch /media/Backups/autosnap.pid
-        /media/Backups/autosnap
+        $dir/autosnap
         sync
-        rm /media/Backups/autosnap.pid
-        umount /media/Backups
+        rm $dir/autosnap.pid
+        umount $dir
     fi
 fi
