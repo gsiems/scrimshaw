@@ -75,6 +75,11 @@ sub backup_files {
     my $target = join ('/', $target_dir, 'data');
     Snapshot::mk_dir($target);
 
+    # TODO: if the source is not a top-level directory then it needs to
+    # be created at the proper level
+    # e.g /var/spool/cron needs to be under .../data/var/spool and not
+    # just under .../data
+
     if ( ( -f $source || -d $source ) && ! -l $source ) {
         `rsync -va --delete --delete-excluded $source $target`;
     }
