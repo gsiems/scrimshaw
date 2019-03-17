@@ -1,0 +1,140 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+
+# Backup one or more directories to a removable drive. Place this script at
+# the root of the removable drive and adjust the config file as needed
+#
+# For a good reference, see: http://www.mikerubel.org/computers/rsync_snapshots/
+
+use File::Path qw(make_path remove_tree);
+
+use FindBin;
+FindBin::again();
+use lib "$FindBin::Bin/lib";
+use Snapshot;
+
+FindBin::again();
+my $bin_dir = "$FindBin::Bin";
+
+my @which = `which rsync`;
+chomp @which;
+my ($rsync_bin) = grep { -x $_ } @which;
+
+if ( !$rsync_bin ) {
+    die "No rsync found. Will not be able to backup files.\n";
+}
+
+my %config = Snapshot::read_config ($bin_dir);
+if ( !keys %{ $config{source} } ) {
+    warn "No sources specified for backup.";
+}
+
+my $backup_base_dir = Snapshot::init_backup_base_dir($bin_dir);
+
+my $save_count = $config{save_count};
+
+my $tmsp = Snapshot::current_tmsp();
+my $snapshot = "snapshot.$tmsp";
+my $target_dir = join ('/', $backup_base_dir, $snapshot);
+
+Snapshot::mk_dir($target_dir);
+
+backup_pkglist( $target_dir );
+
+copy_last_backup($backup_base_dir, $target_dir);
+
+for my $source ( sort keys %{ $config{source} } ) {
+    backup_files ( $source, $target_dir );
+}
+
+Snapshot::write_last_good ($target_dir);
+
+cleanup_old($backup_base_dir, $save_count);
+
+########################################################################
+
+sub copy_last_backup {
+    my ($backup_base_dir, $target_dir  ) = @_;
+
+    my $last_good = Snapshot::read_last_good($backup_base_dir);
+
+    if ( $last_good ) {
+        my $last_backup = join ('/', $backup_base_dir, $last_good);
+        if ( -d $last_backup ) {
+            `cp -dprl "$last_backup/data" $target_dir`;
+        }
+        else {
+            die "$last_good points to the last good backup as $last_backup which cannot be found.\n";
+        }
+    }
+}
+
+sub backup_files {
+    my ( $source, $target_dir ) = @_;
+    my $target = join ('/', $target_dir, 'data');
+    Snapshot::mk_dir($target);
+
+    if ( -f $source || -d $source ) {
+        `rsync -va --delete --delete-excluded $source $target`;
+    }
+}
+
+sub backup_pkglist {
+    my ( $target_dir ) = @_;
+
+    my %cmds = (
+        'rpm' => {
+            'bin'   => 'rpm',
+            'queries' => {
+                'names' => q{rpm -qa --queryformat "%{NAME}\n" | sort},
+                'details' => q{rpm -qa --queryformat "%{NAME}\t%{VERSION}\t%{RELEASE}\t%{EPOCHNUM}\t%{ARCH}\n" | sort},
+            },
+        },
+        'deb' => {
+            'bin'     => 'dpkg',
+            'queries' => {
+                'names'   => q{dpkg-query -W -f '${Package}\n' | sort},
+                'details' => q{dpkg-query -l},
+            },
+        },
+    );
+
+    foreach my $pkg_format ( sort keys %cmds ) {
+        my $bin   = $cmds{$pkg_format}{bin};
+        my @which = `which $bin`;
+        chomp @which;
+        next unless ( grep { -x $_ } @which );
+
+        foreach my $query (keys %{$cmds{$pkg_format}{queries}}) {
+
+            # Backup the list of packages
+            my @list = readpipe $cmds{$pkg_format}{queries}{$query};
+            my $filename = join( '-', $pkg_format, $query );
+
+            my $target = join( '/', $target_dir, $filename );
+            open( my $fh, '>', $target ) || die "Could not open $target for output. $!";
+            print $fh join( '', @list );
+            close $fh;
+        }
+    }
+}
+
+sub cleanup_old {
+    ($backup_base_dir, $save_count) = @_;
+
+    # Prune the old backups
+    if ($save_count && $save_count > 0) {
+        opendir( my $dh, $backup_base_dir ) || die "Can't opendir $backup_base_dir. $!";
+        my @dirs =
+            sort
+            grep { $_ =~ m/^snapshot\./ && -d "$backup_base_dir/$_" }
+            readdir($dh);
+        closedir $dh;
+
+        while ( scalar @dirs > $save_count ) {
+            my $dir = shift @dirs;
+            remove_tree "$backup_base_dir/$dir";
+        }
+    }
+}

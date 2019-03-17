@@ -1,0 +1,59 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+
+use FindBin;
+FindBin::again();
+use lib "$FindBin::Bin/lib";
+use Snapshot;
+
+FindBin::again();
+my $bin_dir = "$FindBin::Bin";
+
+my $backup_base_dir = Snapshot::init_backup_base_dir($bin_dir);
+my %config = Snapshot::read_config ($bin_dir);
+
+my $interval = calc_interval($config{backup_interval});
+my $last     = last_backup($backup_base_dir);
+my $current  = time();
+
+unless ($interval) {
+    die "Could not determine a backup interval.\n";
+}
+
+if ( $last + $interval < $current) {
+    `"$bin_dir/mksnapshot"`;
+}
+
+sub last_backup {
+    my ($backup_base_dir) = @_;
+
+    my $seconds = 0;
+    my $last_good = Snapshot::read_last_good($backup_base_dir);
+    if ( $last_good ) {
+        ($seconds) = (split /\./, $last_good)[-1];
+    }
+    return $seconds;
+}
+
+sub calc_interval {
+    my ($backup_interval) = @_;
+    return 0 unless ($backup_interval);
+
+    my $interval = 0;
+    my %multipliers = (
+        s => 1,
+        m => 60,
+        h => 3600,
+        d => 86400,
+    );
+
+    foreach my $token (split /\s+/, $backup_interval) {
+        my ($num, $unit) = split /(d|h|m|s)/, $token;
+        next unless ($num && $unit);
+        if ($multipliers{$unit}) {
+            $interval += $num * $multipliers{$unit};
+        }
+    }
+    return $interval;
+}
