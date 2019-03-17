@@ -75,7 +75,7 @@ sub backup_files {
     my $target = join ('/', $target_dir, 'data');
     Snapshot::mk_dir($target);
 
-    if ( -f $source || -d $source ) {
+    if ( ( -f $source || -d $source ) && ! -l $source ) {
         `rsync -va --delete --delete-excluded $source $target`;
     }
 }
@@ -85,9 +85,9 @@ sub backup_pkglist {
 
     my %cmds = (
         'rpm' => {
-            'bin'   => 'rpm',
+            'bin'     => 'rpm',
             'queries' => {
-                'names' => q{rpm -qa --queryformat "%{NAME}\n" | sort},
+                'names'   => q{rpm -qa --queryformat "%{NAME}\n" | sort},
                 'details' => q{rpm -qa --queryformat "%{NAME}\t%{VERSION}\t%{RELEASE}\t%{EPOCHNUM}\t%{ARCH}\n" | sort},
             },
         },
@@ -96,6 +96,13 @@ sub backup_pkglist {
             'queries' => {
                 'names'   => q{dpkg-query -W -f '${Package}\n' | sort},
                 'details' => q{dpkg-query -l},
+            },
+        },
+        'snap' => {
+            'bin'     => 'snap',
+            'queries' => {
+                'list'     => q{snap list},
+                'list-all' => q{snap list --all},
             },
         },
     );
