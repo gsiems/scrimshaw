@@ -32,3 +32,9 @@ Currently deb, rpm, and snap packages are supported.
  * **mksnapshot**: Performs a backup using rsync.
 
  * **snapshot.config**: The configuration file for performing snapshots.
+
+## Limitations
+
+ * This does not attempt to follow symlinks. If the symlinked
+ file/directory is outside the data that is being backed up then it
+ will not be backed up.
