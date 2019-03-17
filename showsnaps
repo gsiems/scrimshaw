@@ -1,0 +1,44 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+
+# Check and list the last backup information for all backed up hosts
+
+use FindBin;
+FindBin::again();
+use lib "$FindBin::Bin/lib";
+use Snapshot;
+
+FindBin::again();
+my $bin_dir = "$FindBin::Bin";
+
+my %config = Snapshot::read_config ($bin_dir);
+
+my $interval = Snapshot::calc_interval($config{backup_interval});
+my $current  = time();
+
+my $base_dir = join( '/', $bin_dir, 'backups' );
+
+opendir( my $dh, $base_dir ) || die "Can't opendir $base_dir. $!";
+my @dirs =
+    sort
+    grep { -d "$base_dir/$_" }
+    readdir($dh);
+closedir $dh;
+
+
+print join ("\t", (qw(HOST DATE STATUS))) . "\n";
+foreach my $host (@dirs) {
+    next if ($host eq '.' || $host eq '..');
+    my $host_dir = "$base_dir/$host";
+    my $last_good = Snapshot::read_last_good($host_dir);
+
+    if ($last_good) {
+        my (undef, $date, $seconds) = split /\./, $last_good, 3;
+        my $status = ($seconds + $interval < $current) ? 'Due for backup' : '' ;
+        print join ("\t", $host, $date, $status) . "\n";
+    }
+    else {
+        print join ("\t", $host, '---', 'Has no backup') . "\n";
+    }
+}

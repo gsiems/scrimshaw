@@ -90,6 +90,28 @@ sub read_config {
     return %config;
 }
 
+sub calc_interval {
+    my ($backup_interval) = @_;
+    return 0 unless ($backup_interval);
+
+    my $interval = 0;
+    my %multipliers = (
+        s => 1,
+        m => 60,
+        h => 3600,
+        d => 86400,
+    );
+
+    foreach my $token (split /\s+/, $backup_interval) {
+        my ($num, $unit) = split /(d|h|m|s)/, $token;
+        next unless ($num && $unit);
+        if ($multipliers{$unit}) {
+            $interval += $num * $multipliers{$unit};
+        }
+    }
+    return $interval;
+}
+
 sub slurp { local ( *ARGV, $/ ); @ARGV = shift; <> }
 
 1;
