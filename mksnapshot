@@ -72,15 +72,23 @@ sub copy_last_backup {
 
 sub backup_files {
     my ( $source, $target_dir ) = @_;
-    my $target = join ('/', $target_dir, 'data');
-    Snapshot::mk_dir($target);
 
-    # TODO: if the source is not a top-level directory then it needs to
-    # be created at the proper level
-    # e.g /var/spool/cron needs to be under .../data/var/spool and not
-    # just under .../data
+    if ( ( -f $source || -d $source ) ) { # && ! -l $source ) {
 
-    if ( ( -f $source || -d $source ) && ! -l $source ) {
+        # If the source is not a top-level directory then it needs to
+        # be created at the proper level
+        # e.g /var/spool/cron needs to be under .../data/var/spool and not
+        # just under .../data
+        my $target = join ('/', $target_dir, 'data');
+        my @ary = split '/', $source;
+        if (scalar @ary > 2) {
+            shift @ary;
+            pop @ary;
+            $target = join ('/', $target, @ary);
+        }
+
+        Snapshot::mk_dir($target) unless ( -d $target );
+
         `rsync -va --delete --delete-excluded $source $target`;
     }
 }
