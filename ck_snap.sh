@@ -5,10 +5,10 @@ dir=`mount | grep Backup | awk '{print $3}'`
 
 if [ -d "$dir" ] ; then
     if [ -f "$dir/autosnap" ] ; then
-        if [ -f "$dir/auitosnap.pid" ] ; then
+        if [ -f "$dir/autosnap.pid" ] ; then
             exit
         fi
-        touch /media/Backups/autosnap.pid
+        touch "$dir/autosnap.pid"
         $dir/autosnap
         sync
         rm $dir/autosnap.pid
